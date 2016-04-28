@@ -37,6 +37,9 @@
 #include "ns3/timer.h"
 #include "ns3/net-device.h"
 #include "ns3/output-stream-wrapper.h"
+#include <vector>
+
+#define INFINITY2        0xff
 
 namespace ns3 {
 namespace aomdv {
@@ -52,6 +55,7 @@ enum RouteFlags
   IN_SEARCH = 2,      //!< IN_SEARCH
 };
 
+
 /**
  * \ingroup aomdv
  * \brief Routing table entry
@@ -62,9 +66,48 @@ public:
   /// c-to
   RoutingTableEntry (Ptr<NetDevice> dev = 0,Ipv4Address dst = Ipv4Address (), bool vSeqNo = false, uint32_t m_seqNo = 0,
                      Ipv4InterfaceAddress iface = Ipv4InterfaceAddress (), uint16_t  hops = 0,
-                     Ipv4Address nextHop = Ipv4Address (), Time lifetime = Simulator::Now ());
+                     Ipv4Address nextHop = Ipv4Address (), Time lifetime = Simulator::Now());	//TODO
 
   ~RoutingTableEntry ();
+
+  /// Path - contribution
+
+
+  struct Path
+  {  
+    Ipv4Address nexthop;    // nexthop address
+    uint16_t hopcount;   // hopcount through this nexthop
+    Time expire;     // expiration timeout
+    Ipv4Address lasthop;    // lasthop address
+    Time ts;         // time when we saw this nexthop
+    // CHANGE
+    bool error;
+
+    Path (Ipv4Address nh, uint16_t h, Time expire_time, Ipv4Address lh) :
+      	nexthop(nh), hopcount(h), expire(expire_time), lasthop(lh), ts(Simulator::Now()) ,error (false)
+    {
+    }
+  };
+
+  /// Path functions - contribution
+  void printPaths ();
+  struct Path* PathInsert (Ipv4Address nh, uint16_t h, Time expire_time, Ipv4Address lh);
+  struct Path* PathLookup (Ipv4Address id);
+  struct Path* PathLookupDisjoint (Ipv4Address nh, Ipv4Address lh);
+  bool PathNewDisjoint (Ipv4Address nh, Ipv4Address lh);
+  struct Path* PathLookupLastHop (Ipv4Address id);
+  void PathDelete (Ipv4Address id);
+  void PathAllDelete(void);                  // delete all paths
+  void PathDeleteLongest(void);          // delete longest path
+  bool PathEmpty(void);                   // is the path list empty?
+  struct Path* PathFind(void);                    // find the path that we got first
+  struct Path* PathFindMinHop(void);              // find the shortest path
+  uint16_t PathGetMaxHopcount(void);  
+  uint16_t PathGetMinHopcount(void);  
+  Time PathGetMaxExpirationTime(void); 
+  void PathPurge(void);
+
+
 
   ///\name Precursors management
   //\{
@@ -101,8 +144,8 @@ public:
 
   /// Mark entry as "down" (i.e. disable it)
   void Invalidate (Time badLinkLifetime);
-  
-  // Fields
+  ///\name Fields
+  //\{
   Ipv4Address GetDestination () const { return m_ipv4Route->GetDestination (); }
   Ptr<Ipv4Route> GetRoute () const { return m_ipv4Route; }
   void SetRoute (Ptr<Ipv4Route> r) { m_ipv4Route = r; }
@@ -131,6 +174,7 @@ public:
   Time GetBlacklistTimeout () const { return m_blackListTimeout; }
   /// RREP_ACK timer
   Timer m_ackTimer;
+  //\}
 
   /**
    * \brief Compare destination address
@@ -141,6 +185,12 @@ public:
     return (m_ipv4Route->GetDestination () == dst);
   }
   void Print (Ptr<OutputStreamWrapper> stream) const;
+
+  //Contribution
+  u_int16_t       rt_advertised_hops;
+  u_int32_t       rt_highest_seqno_heard; 
+  int             rt_num_paths;
+  bool			      rt_error;
 
 private:
   /// Valid Destination Sequence Number flag
@@ -170,6 +220,8 @@ private:
 
   /// List of precursors
   std::vector<Ipv4Address> m_precursorList;
+  /// List of Paths - contribution
+  std::vector<Path> m_path;
   /// When I can send another request
   Time m_routeRequestTimout;
   /// Number of route requests
@@ -212,6 +264,10 @@ public:
    * \param rt entry with destination address dst, if exists
    * \return true on success
    */
+  //Contribution
+  void                 rt_dumptable();
+  bool                 rt_has_active_route();
+
   bool LookupRoute (Ipv4Address dst, RoutingTableEntry & rt);
   /// Lookup route in VALID state
   bool LookupValidRoute (Ipv4Address dst, RoutingTableEntry & rt);
@@ -235,6 +291,8 @@ public:
   void Clear () { m_ipv4AddressEntry.clear (); }
   /// Delete all outdated entries and invalidate valid entry if Lifetime is expired
   void Purge ();
+
+  bool HasActiveRoutes();
   /** Mark entry as unidirectional (e.g. add this neighbor to "blacklist" for blacklistTimeout period)
    * \param neighbor - neighbor address link to which assumed to be unidirectional
    * \param blacklistTimeout - time for which the neighboring node is put into the blacklist

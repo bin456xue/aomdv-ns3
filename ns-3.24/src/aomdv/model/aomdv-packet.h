@@ -56,13 +56,15 @@ public:
   /// c-tor
   TypeHeader (MessageType t = AOMDVTYPE_RREQ);
 
-  // Header serialization/deserialization
+  ///\name Header serialization/deserialization
+  //\{
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
   uint32_t GetSerializedSize () const;
   void Serialize (Buffer::Iterator start) const;
   uint32_t Deserialize (Buffer::Iterator start);
   void Print (std::ostream &os) const;
+  //\}
 
   /// Return type
   MessageType Get () const { return m_type; }
@@ -104,17 +106,20 @@ public:
   RreqHeader (uint8_t flags = 0, uint8_t reserved = 0, uint8_t hopCount = 0,
               uint32_t requestID = 0, Ipv4Address dst = Ipv4Address (),
               uint32_t dstSeqNo = 0, Ipv4Address origin = Ipv4Address (),
-              uint32_t originSeqNo = 0);
+              uint32_t originSeqNo = 0, Ipv4Address firstHop = Ipv4Address());
 
-  // Header serialization/deserialization
+  ///\name Header serialization/deserialization
+  //\{
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
   uint32_t GetSerializedSize () const;
   void Serialize (Buffer::Iterator start) const;
   uint32_t Deserialize (Buffer::Iterator start);
   void Print (std::ostream &os) const;
+  //\}
 
-  // Fields
+  ///\name Fields
+  //\{
   void SetHopCount (uint8_t count) { m_hopCount = count; }
   uint8_t GetHopCount () const { return m_hopCount; }
   void SetId (uint32_t id) { m_requestID = id; }
@@ -127,14 +132,19 @@ public:
   Ipv4Address GetOrigin () const { return m_origin; }
   void SetOriginSeqno (uint32_t s) { m_originSeqNo = s; }
   uint32_t GetOriginSeqno () const { return m_originSeqNo; }
+  void SetFirstHop (Ipv4Address a) { m_firstHop = a; }
+  Ipv4Address GetFirstHop () const { return m_firstHop; }
+  //\}
 
-  // Flags
+  ///\name Flags
+  //\{
   void SetGratiousRrep (bool f);
   bool GetGratiousRrep () const;
   void SetDestinationOnly (bool f);
   bool GetDestinationOnly () const;
   void SetUnknownSeqno (bool f);
   bool GetUnknownSeqno () const;
+  //\}
 
   bool operator== (RreqHeader const & o) const;
 private:
@@ -146,6 +156,7 @@ private:
   uint32_t       m_dstSeqNo;       ///< Destination Sequence Number
   Ipv4Address    m_origin;         ///< Originator IP Address
   uint32_t       m_originSeqNo;    ///< Source Sequence Number
+  Ipv4Address    m_firstHop;
 };
 
 std::ostream & operator<< (std::ostream & os, RreqHeader const &);
@@ -175,16 +186,20 @@ public:
   /// c-tor
   RrepHeader (uint8_t prefixSize = 0, uint8_t hopCount = 0, Ipv4Address dst =
                 Ipv4Address (), uint32_t dstSeqNo = 0, Ipv4Address origin =
+                Ipv4Address (), uint32_t bcastID = 0,  Ipv4Address firstHop =
                 Ipv4Address (), Time lifetime = MilliSeconds (0));
-  // Header serialization/deserialization
+  ///\name Header serialization/deserialization
+  //\{
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
   uint32_t GetSerializedSize () const;
   void Serialize (Buffer::Iterator start) const;
   uint32_t Deserialize (Buffer::Iterator start);
   void Print (std::ostream &os) const;
+  //\}
 
-  // Fields
+  ///\name Fields
+  //\{
   void SetHopCount (uint8_t count) { m_hopCount = count; }
   uint8_t GetHopCount () const { return m_hopCount; }
   void SetDst (Ipv4Address a) { m_dst = a; }
@@ -193,14 +208,21 @@ public:
   uint32_t GetDstSeqno () const { return m_dstSeqNo; }
   void SetOrigin (Ipv4Address a) { m_origin = a; }
   Ipv4Address GetOrigin () const { return m_origin; }
+  void SetBcastID (uint32_t s) { m_bcastID = s; }
+  uint32_t GetBcastID () const { return m_bcastID; }
+  void SetFirstHop (Ipv4Address a) { m_firstHop = a; }
+  Ipv4Address GetFirstHop () const { return m_firstHop; }
   void SetLifeTime (Time t);
   Time GetLifeTime () const;
+  //\}
 
-  // Flags
+  ///\name Flags
+  //\{
   void SetAckRequired (bool f);
   bool GetAckRequired () const;
   void SetPrefixSize (uint8_t sz);
   uint8_t GetPrefixSize () const;
+  //\}
 
   /// Configure RREP to be a Hello message
   void SetHello (Ipv4Address src, uint32_t srcSeqNo, Time lifetime);
@@ -213,6 +235,8 @@ private:
   Ipv4Address   m_dst;              ///< Destination IP Address
   uint32_t      m_dstSeqNo;         ///< Destination Sequence Number
   Ipv4Address     m_origin;           ///< Source IP Address
+  uint32_t     m_bcastID;
+  Ipv4Address     m_firstHop;
   uint32_t      m_lifeTime;         ///< Lifetime (in milliseconds)
 };
 
@@ -235,13 +259,15 @@ public:
   /// c-tor
   RrepAckHeader ();
 
-  // Header serialization/deserialization
+  ///\name Header serialization/deserialization
+  //\{
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
   uint32_t GetSerializedSize () const;
   void Serialize (Buffer::Iterator start) const;
   uint32_t Deserialize (Buffer::Iterator start);
   void Print (std::ostream &os) const;
+  //\}
 
   bool operator== (RrepAckHeader const & o) const;
 private:
@@ -275,17 +301,21 @@ public:
   /// c-tor
   RerrHeader ();
 
-  // Header serialization/deserialization
+  ///\name Header serialization/deserialization
+  //\{
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
   uint32_t GetSerializedSize () const;
   void Serialize (Buffer::Iterator i) const;
   uint32_t Deserialize (Buffer::Iterator start);
   void Print (std::ostream &os) const;
+  //\}
 
-  // No delete flag
+  ///\name No delete flag
+  //\{
   void SetNoDelete (bool f);
   bool GetNoDelete () const;
+  //\}
 
   /**
    * Add unreachable node address and its sequence number in RERR header

@@ -46,7 +46,6 @@ TypeHeader::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::aomdv::TypeHeader")
     .SetParent<Header> ()
-    .SetGroupName("Aomdv")
     .AddConstructor<TypeHeader> ()
   ;
   return tid;
@@ -141,9 +140,9 @@ operator<< (std::ostream & os, TypeHeader const & h)
 // RREQ
 //-----------------------------------------------------------------------------
 RreqHeader::RreqHeader (uint8_t flags, uint8_t reserved, uint8_t hopCount, uint32_t requestID, Ipv4Address dst,
-                        uint32_t dstSeqNo, Ipv4Address origin, uint32_t originSeqNo) :
+                        uint32_t dstSeqNo, Ipv4Address origin, uint32_t originSeqNo, Ipv4Address firstHop) :
   m_flags (flags), m_reserved (reserved), m_hopCount (hopCount), m_requestID (requestID), m_dst (dst),
-  m_dstSeqNo (dstSeqNo), m_origin (origin),  m_originSeqNo (originSeqNo)
+  m_dstSeqNo (dstSeqNo), m_origin (origin),  m_originSeqNo (originSeqNo), m_firstHop (firstHop)
 {
 }
 
@@ -154,7 +153,6 @@ RreqHeader::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::aomdv::RreqHeader")
     .SetParent<Header> ()
-    .SetGroupName("Aomdv")
     .AddConstructor<RreqHeader> ()
   ;
   return tid;
@@ -169,7 +167,7 @@ RreqHeader::GetInstanceTypeId () const
 uint32_t
 RreqHeader::GetSerializedSize () const
 {
-  return 23;
+  return 27;                            //Read the source code
 }
 
 void
@@ -183,6 +181,7 @@ RreqHeader::Serialize (Buffer::Iterator i) const
   i.WriteHtonU32 (m_dstSeqNo);
   WriteTo (i, m_origin);
   i.WriteHtonU32 (m_originSeqNo);
+  WriteTo (i, m_firstHop);
 }
 
 uint32_t
@@ -197,6 +196,7 @@ RreqHeader::Deserialize (Buffer::Iterator start)
   m_dstSeqNo = i.ReadNtohU32 ();
   ReadFrom (i, m_origin);
   m_originSeqNo = i.ReadNtohU32 ();
+  ReadFrom (i, m_firstHop);
 
   uint32_t dist = i.GetDistanceFrom (start);
   NS_ASSERT (dist == GetSerializedSize ());
@@ -208,7 +208,7 @@ RreqHeader::Print (std::ostream &os) const
 {
   os << "RREQ ID " << m_requestID << " destination: ipv4 " << m_dst
      << " sequence number " << m_dstSeqNo << " source: ipv4 "
-     << m_origin << " sequence number " << m_originSeqNo
+     << m_origin << " sequence number " << m_originSeqNo << " first hop " << m_firstHop
      << " flags:" << " Gratuitous RREP " << (*this).GetGratiousRrep ()
      << " Destination only " << (*this).GetDestinationOnly ()
      << " Unknown sequence number " << (*this).GetUnknownSeqno ();
@@ -272,7 +272,7 @@ RreqHeader::operator== (RreqHeader const & o) const
   return (m_flags == o.m_flags && m_reserved == o.m_reserved &&
           m_hopCount == o.m_hopCount && m_requestID == o.m_requestID &&
           m_dst == o.m_dst && m_dstSeqNo == o.m_dstSeqNo &&
-          m_origin == o.m_origin && m_originSeqNo == o.m_originSeqNo);
+          m_origin == o.m_origin && m_originSeqNo == o.m_originSeqNo && m_firstHop == o.m_firstHop);
 }
 
 //-----------------------------------------------------------------------------
@@ -280,9 +280,9 @@ RreqHeader::operator== (RreqHeader const & o) const
 //-----------------------------------------------------------------------------
 
 RrepHeader::RrepHeader (uint8_t prefixSize, uint8_t hopCount, Ipv4Address dst,
-                        uint32_t dstSeqNo, Ipv4Address origin, Time lifeTime) :
+                        uint32_t dstSeqNo, Ipv4Address origin, uint32_t bcastID, Ipv4Address firstHop, Time lifeTime) :
   m_flags (0), m_prefixSize (prefixSize), m_hopCount (hopCount),
-  m_dst (dst), m_dstSeqNo (dstSeqNo), m_origin (origin)
+  m_dst (dst), m_dstSeqNo (dstSeqNo), m_origin (origin), m_bcastID (bcastID), m_firstHop (firstHop)
 {
   m_lifeTime = uint32_t (lifeTime.GetMilliSeconds ());
 }
@@ -294,7 +294,6 @@ RrepHeader::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::aomdv::RrepHeader")
     .SetParent<Header> ()
-    .SetGroupName("Aomdv")
     .AddConstructor<RrepHeader> ()
   ;
   return tid;
@@ -309,7 +308,7 @@ RrepHeader::GetInstanceTypeId () const
 uint32_t
 RrepHeader::GetSerializedSize () const
 {
-  return 19;
+  return 27;
 }
 
 void
@@ -321,6 +320,8 @@ RrepHeader::Serialize (Buffer::Iterator i) const
   WriteTo (i, m_dst);
   i.WriteHtonU32 (m_dstSeqNo);
   WriteTo (i, m_origin);
+  i.WriteHtonU32 (m_bcastID);
+  WriteTo (i, m_firstHop);
   i.WriteHtonU32 (m_lifeTime);
 }
 
@@ -335,6 +336,8 @@ RrepHeader::Deserialize (Buffer::Iterator start)
   ReadFrom (i, m_dst);
   m_dstSeqNo = i.ReadNtohU32 ();
   ReadFrom (i, m_origin);
+  m_bcastID = i.ReadNtohU32 ();
+  ReadFrom (i, m_firstHop);
   m_lifeTime = i.ReadNtohU32 ();
 
   uint32_t dist = i.GetDistanceFrom (start);
@@ -345,7 +348,7 @@ RrepHeader::Deserialize (Buffer::Iterator start)
 void
 RrepHeader::Print (std::ostream &os) const
 {
-  os << "destination: ipv4 " << m_dst << " sequence number " << m_dstSeqNo;
+  os << "destination: ipv4 " << m_dst << " sequence number " << m_dstSeqNo << " broadcast ID " << m_bcastID << " first hop " << m_firstHop;
   if (m_prefixSize != 0)
     {
       os << " prefix size " << m_prefixSize;
@@ -399,11 +402,11 @@ RrepHeader::operator== (RrepHeader const & o) const
 {
   return (m_flags == o.m_flags && m_prefixSize == o.m_prefixSize &&
           m_hopCount == o.m_hopCount && m_dst == o.m_dst && m_dstSeqNo == o.m_dstSeqNo &&
-          m_origin == o.m_origin && m_lifeTime == o.m_lifeTime);
+          m_origin == o.m_origin && m_lifeTime == o.m_lifeTime && m_bcastID == o.m_bcastID && m_firstHop == o.m_firstHop);
 }
 
 void
-RrepHeader::SetHello (Ipv4Address origin, uint32_t srcSeqNo, Time lifetime)
+RrepHeader::SetHello (Ipv4Address origin, uint32_t srcSeqNo, Time lifetime)                     //Read source code *
 {
   m_flags = 0;
   m_prefixSize = 0;
@@ -437,7 +440,6 @@ RrepAckHeader::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::aomdv::RrepAckHeader")
     .SetParent<Header> ()
-    .SetGroupName("Aomdv")
     .AddConstructor<RrepAckHeader> ()
   ;
   return tid;
@@ -504,7 +506,6 @@ RerrHeader::GetTypeId ()
 {
   static TypeId tid = TypeId ("ns3::aomdv::RerrHeader")
     .SetParent<Header> ()
-    .SetGroupName("Aomdv")
     .AddConstructor<RerrHeader> ()
   ;
   return tid;

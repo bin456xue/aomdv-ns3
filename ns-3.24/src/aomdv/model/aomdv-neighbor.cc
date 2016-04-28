@@ -30,12 +30,10 @@
 #include "ns3/log.h"
 #include <algorithm>
 
+NS_LOG_COMPONENT_DEFINE ("AomdvNeighbors");
 
 namespace ns3
 {
-  
-NS_LOG_COMPONENT_DEFINE ("AomdvNeighbors");
-
 namespace aomdv
 {
 Neighbors::Neighbors (Time delay) : 
@@ -149,7 +147,7 @@ Neighbors::LookupMacAddress (Ipv4Address addr)
        i != m_arp.end (); ++i)
     {
       ArpCache::Entry * entry = (*i)->Lookup (addr);
-      if (entry != 0 && (entry->IsAlive () || entry->IsPermanent ()) && !entry->IsExpired ())
+      if (entry != 0 && entry->IsAlive () && !entry->IsExpired ())
         {
           hwaddr = Mac48Address::ConvertFrom (entry->GetMacAddress ());
           break;

@@ -31,14 +31,248 @@
 #include <iomanip>
 #include "ns3/simulator.h"
 #include "ns3/log.h"
-
-namespace ns3
-{
+#include <iostream>
 
 NS_LOG_COMPONENT_DEFINE ("AomdvRoutingTable");
 
+namespace ns3
+{
 namespace aomdv
 {
+/* 
+Our contribution 
+*/
+
+void RoutingTableEntry::printPaths() {
+	for (std::vector<Path>::const_iterator i = m_path.begin(); i != m_path.end(); ++i) {
+	    	std::cout<<i->nexthop<<" "<<i->hopcount<<" "<<i->lasthop;  
+	}
+}
+
+struct RoutingTableEntry::Path* RoutingTableEntry::PathInsert(Ipv4Address nh, uint16_t h, Time expire_time, Ipv4Address lh) {
+
+  struct RoutingTableEntry::Path path = RoutingTableEntry::Path(nh, h, expire_time, lh);
+  //assert(path);
+  #ifdef DEBUG
+  fprintf(stderr, "%s: (%d\t%d)\n", __FUNCTION__, path.nh, path.h);
+  #endif // DEBUG
+  m_path.push_back (path);
+  rt_num_paths += 1;     //TODO
+  RoutingTableEntry::Path *p = (struct RoutingTableEntry::Path*)malloc(sizeof(struct RoutingTableEntry::Path));
+  p = &path;
+  return p;
+}
+
+struct RoutingTableEntry::Path* RoutingTableEntry::PathLookup(Ipv4Address id) {
+
+  //Path *path = rt_path_list.lh_first;
+  NS_LOG_FUNCTION (this << id);
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+      if (i->nexthop == id)
+      {
+        NS_LOG_LOGIC ("Path " << id << " found");
+        struct RoutingTableEntry::Path *path = &(*i);
+        return path;
+      }
+  }
+  NS_LOG_LOGIC ("Path " << id << " not found");
+  return NULL;
+}
+
+
+struct RoutingTableEntry::Path* RoutingTableEntry::PathLookupDisjoint (Ipv4Address nh, Ipv4Address lh) {
+
+  //Path *path = rt_path_list.lh_first;
+  NS_LOG_FUNCTION (this << nh << lh);
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+      if (i->nexthop == nh && i->lasthop == lh)
+      {
+        NS_LOG_LOGIC ("Disjoint Path " << nh << lh << " found");
+        struct RoutingTableEntry::Path *path = &(*i);
+        return path;
+      }
+  }
+  NS_LOG_LOGIC ("Disjoint Path " << nh << lh <<" not found");
+  return NULL;
+}
+
+bool RoutingTableEntry::PathNewDisjoint (Ipv4Address nh, Ipv4Address lh) {
+
+  //Path *path = rt_path_list.lh_first;
+  NS_LOG_FUNCTION (this << nh << lh);
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+      if (i->nexthop == nh || i->lasthop == lh)
+      {
+        NS_LOG_LOGIC ("Disjoint New Path " << nh << lh << " found");
+        return false;
+      }
+  }
+  NS_LOG_LOGIC ("Disjoint New Path " << nh << lh <<" not found");
+  return true;
+}
+
+struct RoutingTableEntry::Path* RoutingTableEntry::PathLookupLastHop (Ipv4Address id) {
+
+  //Path *path = rt_path_list.lh_first;
+  NS_LOG_FUNCTION (this << id);
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+      if (i->lasthop == id)
+      {
+        NS_LOG_LOGIC ("Path " << id << " found");
+        struct RoutingTableEntry::Path *path = &(*i);
+        return path;
+      }
+  }
+  NS_LOG_LOGIC ("Path " << id << " not found");
+  return NULL;
+}
+
+//TODO
+void RoutingTableEntry::PathDelete (Ipv4Address id)
+{
+  NS_LOG_FUNCTION (this << id);
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+    if (i->nexthop == id)
+    {
+      NS_LOG_LOGIC ("Path " << id << " not found");
+      m_path.erase(i);
+      rt_num_paths -= 1;   //TODO
+    }
+  }
+}
+
+void RoutingTableEntry::PathAllDelete(void)
+{
+  NS_LOG_FUNCTION (this);
+  m_path.clear (); 
+  rt_num_paths = 0;
+}
+
+void RoutingTableEntry::PathDeleteLongest(void)
+{
+  struct RoutingTableEntry::Path *path = NULL;
+  std::vector<Path>::iterator j;
+  uint16_t max_hopcount = 0;
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+    if (i->hopcount > max_hopcount)
+    {
+      assert (i->hopcount != INFINITY2); //TODO
+      path = &(*i);
+      j = i;
+      max_hopcount = i->hopcount;
+    }
+  }
+  if(path)
+  {
+    m_path.erase(j);
+    rt_num_paths -= 1;
+  }
+}
+
+bool RoutingTableEntry::PathEmpty(void)
+{
+  struct RoutingTableEntry::Path *path = NULL;
+  std::vector<Path>::iterator i = m_path.begin();
+  path = &(*i);
+  if (path) {
+    assert(rt_num_paths > 0);
+    return false;
+  }
+  else {
+    assert(rt_num_paths == 0);
+    return true;
+  }
+
+}
+
+struct RoutingTableEntry::Path* RoutingTableEntry::PathFind(void)
+{
+  struct RoutingTableEntry::Path *path = NULL;
+  std::vector<Path>::iterator i = m_path.begin();
+  path = &(*i);
+  return path;
+}
+
+struct RoutingTableEntry::Path* RoutingTableEntry::PathFindMinHop(void)
+{
+  struct RoutingTableEntry::Path *path = NULL;
+  uint16_t min_hopcount = 0xffff;
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+    if (i->hopcount < min_hopcount)
+    {
+      path = &(*i);
+      min_hopcount = i->hopcount;
+    }
+  }
+  return path;
+}
+
+uint16_t RoutingTableEntry::PathGetMaxHopcount(void)
+{
+  uint16_t max_hopcount = 0;
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+    if (i->hopcount > max_hopcount)
+    {
+      max_hopcount = i->hopcount;
+    }
+  }
+  if(max_hopcount == 0) return INFINITY2;
+  else return max_hopcount;
+} 
+
+uint16_t RoutingTableEntry::PathGetMinHopcount(void)
+{
+  uint16_t min_hopcount = INFINITY2;
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+    if (i->hopcount < min_hopcount)
+    {
+      min_hopcount = i->hopcount;
+    }
+  }
+  return min_hopcount;
+}  
+
+Time RoutingTableEntry::PathGetMaxExpirationTime(void)
+{
+  Time max_expire_time = Time();
+  for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+  {
+    if (i->expire > max_expire_time)
+    {
+      max_expire_time = i->expire;
+    }
+  }
+  return max_expire_time;
+} 
+
+void RoutingTableEntry::PathPurge(void)
+{
+  Time now = Simulator::Now();
+  bool cond;
+  do{
+    cond = false;
+    for (std::vector<Path>::iterator i = m_path.begin(); i!= m_path.end(); ++i)
+    {
+      if (i->expire < now)
+      {
+       cond = true;
+       m_path.erase(i);
+       rt_num_paths -= 1;
+       break;
+      }
+    }
+  } while(cond);
+}
+
 
 /*
  The Routing Table
@@ -47,7 +281,7 @@ namespace aomdv
 RoutingTableEntry::RoutingTableEntry (Ptr<NetDevice> dev, Ipv4Address dst, bool vSeqNo, uint32_t seqNo,
                                       Ipv4InterfaceAddress iface, uint16_t hops, Ipv4Address nextHop, Time lifetime) :
   m_ackTimer (Timer::CANCEL_ON_DESTROY),
-  m_validSeqNo (vSeqNo), m_seqNo (seqNo), m_hops (hops),
+  rt_advertised_hops (INFINITY2), rt_highest_seqno_heard (0), rt_num_paths (0), rt_error (false),
   m_lifeTime (lifetime + Simulator::Now ()), m_iface (iface), m_flag (VALID),
   m_reqCount (0), m_blackListState (false), m_blackListTimeout (Simulator::Now ())
 {
@@ -297,20 +531,17 @@ RoutingTable::SetEntryState (Ipv4Address id, RouteFlags state)
 void
 RoutingTable::GetListOfDestinationWithNextHop (Ipv4Address nextHop, std::map<Ipv4Address, uint32_t> & unreachable )
 {
+  //contribution
   NS_LOG_FUNCTION (this);
   Purge ();
   unreachable.clear ();
-  for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i =
-         m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); ++i)
+  for (std::map<Ipv4Address, RoutingTableEntry>::iterator i = m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); ++i)
     {
-      if (i->second.GetNextHop () == nextHop)
-        {
-          NS_LOG_LOGIC ("Unreachable insert " << i->first << " " << i->second.GetSeqNo ());
-          unreachable.insert (std::make_pair (i->first, i->second.GetSeqNo ()));
-        }
+      i->second.PathDelete(nextHop);
     }
 }
 
+/*
 void
 RoutingTable::InvalidateRoutesWithDst (const std::map<Ipv4Address, uint32_t> & unreachable)
 {
@@ -330,6 +561,7 @@ RoutingTable::InvalidateRoutesWithDst (const std::map<Ipv4Address, uint32_t> & u
         }
     }
 }
+*/
 
 void
 RoutingTable::DeleteAllRoutesFromInterface (Ipv4InterfaceAddress iface)
@@ -415,6 +647,19 @@ RoutingTable::Purge (std::map<Ipv4Address, RoutingTableEntry> &table) const
           ++i;
         }
     }
+}
+
+//contribution
+bool RoutingTable::HasActiveRoutes() {
+  for (std::map<Ipv4Address, RoutingTableEntry>::const_iterator i =
+         m_ipv4AddressEntry.begin (); i != m_ipv4AddressEntry.end (); ++i)
+       {
+        if(i->second.GetFlag() == VALID)
+        {
+          return true;
+        }
+       }
+       return false;
 }
 
 bool
